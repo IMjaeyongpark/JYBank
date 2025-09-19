@@ -35,12 +35,12 @@ public class TransferService {
         dst.credit(req.amount());
 
         LedgerEntry d = new LedgerEntry();
-        d.setWalletId(src.getId()); d.setDirection("debit");
+        d.setWalletId(src.getWalletId()); d.setDirection("debit");
         d.setAmount(req.amount()); d.setBalanceAfter(src.getBalance());
         d.setRefType("TRANSFER"); d.setRefId("TBD");
 
         LedgerEntry c = new LedgerEntry();
-        c.setWalletId(dst.getId()); c.setDirection("credit");
+        c.setWalletId(dst.getWalletId()); c.setDirection("credit");
         c.setAmount(req.amount()); c.setBalanceAfter(dst.getBalance());
         c.setRefType("TRANSFER"); c.setRefId("TBD");
 

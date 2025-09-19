@@ -1,5 +1,8 @@
 package JYBank.JYBank.config;
 
+import JYBank.JYBank.service.auth.AuthService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -11,10 +14,17 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final AuthService authService;
+
+    @Value("${jwt.secret}")
+    private String secretKey;
+
     private static final String[] WHITELIST = {
             "/v3/api-docs/**", "/swagger-ui/**", "/actuator/**",
-            "/webhooks/**"
+            "/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh"
     };
 
     @Bean

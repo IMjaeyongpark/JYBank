@@ -1,7 +1,7 @@
 package JYBank.JYBank.config;
 
 
-import JYBank.JYBank.service.AuthService;
+import JYBank.JYBank.service.auth.AuthService;
 import JYBank.JYBank.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
