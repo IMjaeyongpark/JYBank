@@ -47,6 +47,10 @@ dependencies {
 	// Lombok
 	compileOnly 'org.projectlombok:lombok:1.18.30'
 	annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+	//kafka
+	implementation 'org.springframework.kafka:spring-kafka'
+
 }
 
 tasks.named('test') {

@@ -36,3 +36,6 @@ out/
 ### VS Code ###
 .vscode/
 
+# application 설정 제외
+src/main/resources/application.properties
+

@@ -12,6 +12,7 @@ public class TransferController {
     private final TransferService service;
     public TransferController(TransferService service) { this.service = service; }
 
+    //송금, 결제, 주문
     @PostMapping
     public ResponseEntity<CreateRes> create(@RequestHeader("Idempotency-Key") String idemKey,
                                             @RequestBody @Valid CreateReq body) {
