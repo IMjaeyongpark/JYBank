@@ -1,6 +1,5 @@
 package JYBank.JYBank.config;
 
-
 import JYBank.JYBank.service.auth.AuthService;
 import JYBank.JYBank.util.JwtUtil;
 import jakarta.servlet.FilterChain;
@@ -23,43 +22,64 @@ import java.util.List;
 @Slf4j
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final AuthService authService;
+    private final AuthService authService; // 추후 role 조회 등 확장에 사용
     private final String secretKey;
 
-
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
+
+        // 이미 인증된 상태면 그냥 다음으로
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         final String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
-        log.info("authentication : {}", authorization);
 
+        // Authorization 헤더 없거나 Bearer 아님 → 무인증 요청으로 패스
         if (authorization == null || !authorization.startsWith("Bearer ")) {
-            log.error("authentication 없음.");
             filterChain.doFilter(request, response);
-
             return;
         }
 
-        // Token꺼내기
-        String  token  = authorization.split(" ")[1];
+        // "Bearer " 제거
+        final String token = authorization.substring(7);
 
-        // Token Expired되었는지 여부
-        if(JwtUtil.isExpired(token,secretKey)){
-            log.error("토큰 만료됨");
-            filterChain.doFilter(request,response);
-            return;
+        try {
+            // 만료 토큰은 무시(혹은 response 401로 바꿔도 됨)
+            if (JwtUtil.isExpired(token, secretKey)) {
+                log.debug("JWT expired");
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            // subject/loginId 추출
+            final String loginId = JwtUtil.getLoginId(token, secretKey);
+            if (loginId == null || loginId.isBlank()) {
+                log.debug("JWT has no subject/loginId");
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            // 권한 부여 (임시로 USER 고정; 필요 시 role 클레임/DB 조회로 확장)
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            loginId,
+                            null,
+                            List.of(new SimpleGrantedAuthority("USER"))
+                    );
+
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        } catch (Exception e) {
+            // 서명 오류/형식 오류 등 → 조용히 패스(필요시 401 처리로 변경 가능)
+            log.debug("JWT parse/verify failed: {}", e.getMessage());
         }
 
-        // UserName 토큰에서 꺼내기
-        String userName = JwtUtil.getLoginId(token,secretKey);
-
-        // 권한 부여
-        UsernamePasswordAuthenticationToken authenticationToken =
-                new UsernamePasswordAuthenticationToken(userName, null, List.of(new SimpleGrantedAuthority("USER")));
-
-        authenticationToken.setDetails((new WebAuthenticationDetailsSource().buildDetails(request)));
-        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
         filterChain.doFilter(request, response);
-
     }
 }

@@ -3,8 +3,10 @@ package JYBank.JYBank.service.auth;
 import JYBank.JYBank.domain.user.AppUser;
 import JYBank.JYBank.domain.user.KycStatus;
 import JYBank.JYBank.domain.user.UserRole;
+import JYBank.JYBank.dto.auth.LoginDtos;
 import JYBank.JYBank.dto.auth.SignUpDtos;
 import JYBank.JYBank.repository.AppUserRepository;
+import JYBank.JYBank.util.JwtUtil;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -54,6 +56,22 @@ public class AuthService {
                 saved.getKycStatus().name(),
                 saved.getCreatedAt()
         );
+    }
+
+
+    @Transactional
+    public LoginDtos.LoginResponse login(LoginDtos.LoginRequest req) {
+        AppUser user = userRepo.findByEmailIgnoreCase(req.email())
+                .orElseThrow(() -> new IllegalArgumentException("잘못된 이메일 또는 비밀번호"));
+
+        if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+            throw new IllegalArgumentException("잘못된 이메일 또는 비밀번호");
+        }
+
+        String accessToken = JwtUtil.createAccessToken(user.getEmail(), secretKey, 3600); // 1시간
+        String refreshToken = JwtUtil.createRefreshToken(user.getEmail(), secretKey, 1209600); // 14일
+
+        return new LoginDtos.LoginResponse(accessToken, refreshToken);
     }
 
     public static class EmailAlreadyUsedException extends RuntimeException {

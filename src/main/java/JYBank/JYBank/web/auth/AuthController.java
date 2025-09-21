@@ -1,5 +1,7 @@
 package JYBank.JYBank.web.auth;
 
+import JYBank.JYBank.dto.auth.LoginDtos;
+import JYBank.JYBank.dto.auth.LoginDtos.*;
 import JYBank.JYBank.dto.auth.SignUpDtos.*;
 import JYBank.JYBank.service.auth.AuthService;
 import jakarta.validation.Valid;
@@ -22,8 +24,12 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<SignUpResponse> register(@RequestBody @Valid SignUpRequest req) {
         SignUpResponse res = authService.register(req);
-        // Location 헤더로 새 리소스 URI 힌트 (선택)
         return ResponseEntity.created(URI.create("/v1/users/" + res.userId())).body(res);
+    }
+
+    @GetMapping("/login")
+    public ResponseEntity<LoginResponse> register(@RequestBody @Valid LoginRequest req) {
+        return ResponseEntity.ok(authService.login(req));
     }
 
 }

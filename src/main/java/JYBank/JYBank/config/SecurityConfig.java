@@ -35,8 +35,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(WHITELIST).permitAll()
                         .anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults())
-                .addFilterBefore(new JwtFilter(authService, secretKey), UsernamePasswordAuthenticationFilter.class)
+                .httpBasic(Customizer.withDefaults()).
+                addFilterBefore(new JwtFilter(authService, secretKey),
+                        org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
+
         ;
         return http.build();
     }
