@@ -66,4 +66,15 @@ public class JwtUtil {
         String t = token.trim();
         return t.startsWith("Bearer ") ? t.substring(7) : t;
     }
+
+    public static boolean isRefreshToken(String token, String secretKey) {
+        var claims = Jwts.parserBuilder()
+                .setSigningKey(key(secretKey))
+                .setAllowedClockSkewSeconds(30)
+                .build()
+                .parseClaimsJws(stripBearer(token))
+                .getBody();
+        return "refresh".equals(claims.get("typ", String.class));
+    }
+
 }
