@@ -47,6 +47,8 @@ public class AppUser {
 
     private Instant lastLogoutAt;
 
+    private Instant lastPasswordChangeAt;
+
     // 연관관계 매핑 (지갑, 은행계좌)
     // 예시: @OneToMany(mappedBy = "user") private List<Wallet> wallets;
 }

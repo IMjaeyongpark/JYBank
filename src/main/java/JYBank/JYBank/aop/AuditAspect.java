@@ -56,7 +56,12 @@ public class AuditAspect {
 
     // 주체/참조 추출 로직은 필요에 맞게 보완
     private String principalOf(JoinPoint jp) {
-        // 예: 첫 번째 파라미터가 userId 라면:
+        // 1) SecurityContext 우선
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() != null) {
+            return String.valueOf(auth.getPrincipal()); // 보통 loginId/email
+        }
+        // 2) 파라미터에서 추정 (현재 구현 유지)
         Object[] args = jp.getArgs();
         return (args != null && args.length > 0) ? String.valueOf(args[0]) : "unknown";
     }
@@ -65,4 +70,6 @@ public class AuditAspect {
         // 예: 서비스가 TransferCreateRes{transferId,...} 반환 시 ID 추출하도록 커스텀
         return (ret != null) ? ret.toString() : null;
     }
+
+
 }
