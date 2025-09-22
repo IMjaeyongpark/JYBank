@@ -6,9 +6,11 @@ import JYBank.JYBank.dto.auth.TokenRefreshDtos.*;
 import JYBank.JYBank.service.auth.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.Map;
 
 
 @RestController
@@ -40,4 +42,9 @@ public class AuthController {
         return ResponseEntity.ok(authService.refresh(req));
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, Object>> logoutAll(@AuthenticationPrincipal(expression = "username") String loginId) {
+        int n = authService.logout(loginId);
+        return ResponseEntity.ok(Map.of("revokedSessions", n));
+    }
 }

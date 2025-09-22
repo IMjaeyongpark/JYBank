@@ -3,6 +3,7 @@ package JYBank.JYBank.domain.user;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -43,6 +44,8 @@ public class AppUser {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    private Instant lastLogoutAt;
 
     // 연관관계 매핑 (지갑, 은행계좌)
     // 예시: @OneToMany(mappedBy = "user") private List<Wallet> wallets;

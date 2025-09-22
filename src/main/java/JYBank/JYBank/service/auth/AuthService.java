@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class AuthService {
@@ -51,32 +52,55 @@ public class AuthService {
             byte[] digest = md.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
             return "auth:refresh:" + Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
         } catch (Exception e) {
-            // fallback (실무에선 로깅)
             return "auth:refresh:" + Integer.toHexString(refreshToken.hashCode());
         }
     }
 
-    private void storeRefresh(String refreshToken) {
-        String key = rKey(refreshToken);
-        redis.opsForValue().set(key, "1", Duration.ofMillis(refreshTokenExpiredMs));
-    }
 
     private boolean existsRefresh(String refreshToken) {
         return Boolean.TRUE.equals(redis.hasKey(rKey(refreshToken)));
     }
 
-    private void deleteRefresh(String refreshToken) {
-        redis.delete(rKey(refreshToken));
+    private String uSetKey(String loginId) {
+        return "auth:user:" + loginId + ":refresh";
     }
 
+    //레디스에 리프레쉬 토큰 저장
+    private void storeRefresh(String refreshToken, String loginId) {
+        String key = rKey(refreshToken);
+        Duration ttl = Duration.ofMillis(refreshTokenExpiredMs);
+
+        // 개별 토큰 화이트리스트
+        redis.opsForValue().set(key, "1", ttl);
+
+        // 사용자별 세션 Set에 등록
+        String setKey = uSetKey(loginId);
+        redis.opsForSet().add(setKey, key);
+        redis.expire(setKey, ttl);
+    }
+
+    //레디스에 리프레쉬 토큰 삭제 - 로그아웃
+    private void deleteRefresh(String refreshToken, String loginId) {
+        String key = rKey(refreshToken);
+        redis.delete(key);
+        if (loginId != null && !loginId.isBlank()) {
+            redis.opsForSet().remove(uSetKey(loginId), key);
+        }
+    }
+
+
+    //회원가입
     @Transactional
     public SignUpResponse register(SignUpRequest req) {
+        //소문자로 변경
         String email = req.email().trim().toLowerCase();
 
+        //아이디 중복 확인
         if (userRepo.existsByEmailIgnoreCase(email)) {
             throw new EmailAlreadyUsedException(email);
         }
 
+        //유저 생성
         AppUser user = AppUser.builder()
                 .email(email)
                 .passwordHash(passwordEncoder.encode(req.password()))
@@ -86,6 +110,7 @@ public class AuthService {
                 .role(UserRole.USER)
                 .build();
 
+        //유저 저장
         AppUser saved = userRepo.save(user);
         return new SignUpResponse(
                 saved.getUserId(),
@@ -96,6 +121,7 @@ public class AuthService {
     }
 
 
+    //유저 로그인
     @Transactional
     public LoginResponse login(LoginRequest req) {
         // 1) 이메일 정규화
@@ -114,11 +140,12 @@ public class AuthService {
         String refreshToken = JwtUtil.createRefreshToken(user.getEmail(), secretKey, refreshTokenExpiredMs);
 
         // 4) Redis 화이트리스트 등록 (TTL=refresh 만료와 동일)
-        storeRefresh(refreshToken);
+        storeRefresh(refreshToken, user.getEmail());
 
         return new LoginResponse(accessToken, refreshToken);
     }
 
+    //리프레쉬 토큰 재발급
     public TokenRefreshResponse refresh(TokenRefreshRequest req) {
         String oldRefresh = req.refreshToken();
 
@@ -143,11 +170,35 @@ public class AuthService {
         String newRefresh = JwtUtil.createRefreshToken(loginId, secretKey, refreshTokenExpiredMs);
 
         // 5) 기존 refresh 폐기 → 새 refresh 저장
-        deleteRefresh(oldRefresh);
-        storeRefresh(newRefresh);
+        deleteRefresh(oldRefresh, loginId);
+        storeRefresh(newRefresh, loginId);
 
         return new TokenRefreshResponse(newAccess, newRefresh,
                 Instant.now().plusMillis(accessTokenExpiredMs));
+    }
+
+    // 전체 디바이스에서 로그아웃: loginId(=email) 기준으로 모든 Refresh 폐기
+    @Transactional
+    public int logout(String loginId) {
+        if (loginId == null || loginId.isBlank()) return 0;
+
+        String setKey = uSetKey(loginId);
+        Set<String> tokenKeys = redis.opsForSet().members(setKey);
+
+        int revoked = 0;
+        if (tokenKeys != null && !tokenKeys.isEmpty()) {
+            Long n = redis.delete(tokenKeys);      // 모든 refresh whitelist 키 일괄 삭제
+            revoked = (n == null) ? 0 : n.intValue();
+        }
+        redis.delete(setKey);                      // 사용자 Set 자체 삭제
+
+        // (옵션 강추) 즉시 무효화: lastLogoutAt 갱신 → Access iat 비교로 즉시 차단
+        userRepo.findByEmailIgnoreCase(loginId).ifPresent(u -> {
+            u.setLastLogoutAt(Instant.now());
+            userRepo.save(u);
+        });
+
+        return revoked;
     }
 
 

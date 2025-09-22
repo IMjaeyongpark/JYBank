@@ -5,6 +5,7 @@ import io.jsonwebtoken.security.Keys;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.time.Instant;
 import java.util.Date;
 
 public class JwtUtil {
@@ -33,11 +34,13 @@ public class JwtUtil {
         return c.getExpiration().before(new Date());
     }
 
+    /** ✅ Access 토큰 발급: typ=access 명시(기존 토큰과의 호환을 위해 아래 isAccessToken에서 null도 access로 간주) */
     public static String createAccessToken(String loginId, String secretKey, long expiredMs) {
         Date now = new Date();
         return Jwts.builder()
                 .setSubject(loginId)                 // 표준 subject 사용
                 .claim("loginId", loginId)           // 기존 호환 위해 유지
+                .claim("typ", "access")              // ✅ 명시적으로 access 표시
                 .setIssuedAt(now)
                 .setExpiration(new Date(now.getTime() + expiredMs))
                 .signWith(key(secretKey), SignatureAlgorithm.HS256)
@@ -68,13 +71,27 @@ public class JwtUtil {
     }
 
     public static boolean isRefreshToken(String token, String secretKey) {
-        var claims = Jwts.parserBuilder()
-                .setSigningKey(key(secretKey))
-                .setAllowedClockSkewSeconds(30)
-                .build()
+        var claims = parser(secretKey)
                 .parseClaimsJws(stripBearer(token))
                 .getBody();
         return "refresh".equals(claims.get("typ", String.class));
     }
 
+    /** ✅ 하드 로그아웃 체크용: iat(발급시각) Instant 반환 (없으면 null) */
+    public static Instant getIssuedAt(String token, String secretKey) {
+        Date iat = parseClaims(token, secretKey).getIssuedAt();
+        return (iat == null) ? null : iat.toInstant();
+    }
+
+    /** (선택) Access 토큰 판별. typ 미설정(과거 토큰)은 access로 간주 → 하위호환 */
+    public static boolean isAccessToken(String token, String secretKey) {
+        String typ = parseClaims(token, secretKey).get("typ", String.class);
+        return typ == null || "access".equals(typ);
+    }
+
+    /** (선택) 만료시각 Instant가 필요하면 */
+    public static Instant getExpiration(String token, String secretKey) {
+        Date exp = parseClaims(token, secretKey).getExpiration();
+        return (exp == null) ? null : exp.toInstant();
+    }
 }
